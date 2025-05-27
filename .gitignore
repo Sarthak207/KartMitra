@@ -1,0 +1,6 @@
+node_modules/
+.env
+*.log
+.DS_Store
+smart_cart_backend/node_modules/
+smart_cart_backend/.env
