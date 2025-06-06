@@ -1,11 +1,31 @@
-// routes/auth.js - Enhanced Authentication API with MariaDB
+// routes/auth.js - Authentication API for Original SmartCart UI
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { db } = require('../db');
 
-// Input validation middleware
+// Demo credentials for original UI (as shown in login screen)
+const DEMO_CREDENTIALS = {
+    demo: {
+        id: 999,
+        username: 'demo',
+        email: 'demo@smartcart.com',
+        name: 'Demo User',
+        password: 'demo123',
+        role: 'customer'
+    },
+    admin: {
+        id: 998,
+        username: 'admin',
+        email: 'admin@smartcart.com', 
+        name: 'Admin User',
+        password: 'admin123',
+        role: 'admin'
+    }
+};
+
+// Input validation middleware for original UI
 const validateRegistration = (req, res, next) => {
     const { username, email, password, name } = req.body;
     const errors = [];
@@ -28,13 +48,16 @@ const validateRegistration = (req, res, next) => {
         errors.push('Password must be at least 6 characters long');
     }
     
-    // Name validation
+    // Name validation (required for original UI)
     if (!name || name.trim().length < 2) {
-        errors.push('Name must be at least 2 characters long');
+        errors.push('Full name is required and must be at least 2 characters long');
     }
     
     if (errors.length > 0) {
-        return res.status(400).json({ error: errors.join(', ') });
+        return res.status(400).json({ 
+            error: errors.join(', '),
+            uiHint: 'Check the registration form in your green interface'
+        });
     }
     
     // Sanitize inputs
@@ -49,7 +72,10 @@ const validateLogin = (req, res, next) => {
     const { username, password } = req.body;
     
     if (!username || !password) {
-        return res.status(400).json({ error: 'Username and password are required' });
+        return res.status(400).json({ 
+            error: 'Username and password are required',
+            uiHint: 'Try demo credentials: demo/demo123 or admin/admin123'
+        });
     }
     
     // Sanitize username
@@ -58,10 +84,10 @@ const validateLogin = (req, res, next) => {
     next();
 };
 
-// Rate limiting store (in production, use Redis)
+// Rate limiting store (optimized for original UI testing)
 const loginAttempts = new Map();
 const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
-const MAX_LOGIN_ATTEMPTS = 5;
+const MAX_LOGIN_ATTEMPTS = 10; // Increased for demo testing
 
 const rateLimitMiddleware = (req, res, next) => {
     const clientIP = req.ip || req.connection.remoteAddress;
@@ -81,18 +107,47 @@ const rateLimitMiddleware = (req, res, next) => {
     if (attempts.count >= MAX_LOGIN_ATTEMPTS) {
         return res.status(429).json({ 
             error: 'Too many login attempts. Please try again later.',
-            retryAfter: Math.ceil((attempts.resetTime - now) / 1000)
+            retryAfter: Math.ceil((attempts.resetTime - now) / 1000),
+            uiHint: 'Wait a few minutes before trying again'
         });
     }
     
     next();
 };
 
-// Register new user
+// Demo credentials endpoint for original UI
+router.get('/demo-credentials', (req, res) => {
+    res.json({
+        message: 'Demo credentials for original SmartCart UI',
+        credentials: {
+            customer: {
+                username: 'demo',
+                password: 'demo123',
+                description: 'Regular customer account'
+            },
+            admin: {
+                username: 'admin',
+                password: 'admin123', 
+                description: 'Administrator account'
+            }
+        },
+        note: 'These credentials are displayed in the original UI login screen'
+    });
+});
+
+// Register new user (enhanced for original UI)
 router.post('/register', validateRegistration, async (req, res) => {
     const { username, email, password, name } = req.body;
     
     try {
+        // Check against demo usernames
+        if (username === 'demo' || username === 'admin') {
+            return res.status(409).json({ 
+                error: 'Username reserved for demo purposes',
+                uiHint: 'Choose a different username'
+            });
+        }
+        
         // Check if user already exists
         const existingUser = await db.query(
             'SELECT id, username, email FROM users WHERE username = ? OR email = ?',
@@ -102,75 +157,98 @@ router.post('/register', validateRegistration, async (req, res) => {
         if (existingUser.length > 0) {
             const existing = existingUser[0];
             if (existing.username === username) {
-                return res.status(409).json({ error: 'Username already exists' });
+                return res.status(409).json({ 
+                    error: 'Username already exists',
+                    uiHint: 'Try a different username'
+                });
             }
             if (existing.email === email) {
-                return res.status(409).json({ error: 'Email already exists' });
+                return res.status(409).json({ 
+                    error: 'Email already exists',
+                    uiHint: 'Try a different email address'
+                });
             }
         }
         
-        // Hash password with higher cost for better security
+        // Hash password
         const saltRounds = process.env.NODE_ENV === 'production' ? 12 : 10;
         const hashedPassword = await bcrypt.hash(password, saltRounds);
         
-        // Insert new user
+        // Insert new user with original UI defaults
         const result = await db.query(
-            `INSERT INTO users (username, email, password_hash, name, role, created_at) 
-             VALUES (?, ?, ?, ?, ?, NOW())`,
-            [username, email, hashedPassword, name, 'customer']
+            `INSERT INTO users (username, email, password_hash, name, role, created_at, is_active) 
+             VALUES (?, ?, ?, ?, ?, NOW(), ?)`,
+            [username, email, hashedPassword, name, 'customer', true]
         );
         
-        console.log(`✅ New user registered: ${username} (ID: ${result.insertId})`);
+        console.log(`✅ New user registered: ${username} (${name}) - ID: ${result.insertId}`);
         
         res.status(201).json({ 
             id: result.insertId.toString(), 
-            message: 'User registered successfully',
-            username: username
+            message: 'Registration successful! You can now login.',
+            username: username,
+            name: name,
+            success: true,
+            uiHint: 'Switch to login tab to sign in'
         });
     } catch (err) {
         console.error('Registration error:', err);
         
-        // Handle specific database errors
         if (err.code === 'ER_DUP_ENTRY') {
-            return res.status(409).json({ error: 'User already exists' });
+            return res.status(409).json({ 
+                error: 'User already exists',
+                uiHint: 'Try different credentials'
+            });
         }
         
-        res.status(500).json({ error: 'Registration failed. Please try again.' });
+        res.status(500).json({ 
+            error: 'Registration failed. Please try again.',
+            uiHint: 'Check your internet connection'
+        });
     }
 });
 
-// Login user
+// Login user (enhanced with demo credentials support)
 router.post('/login', rateLimitMiddleware, validateLogin, async (req, res) => {
     const { username, password } = req.body;
     const clientIP = req.ip || req.connection.remoteAddress;
     
     try {
-        // Find user by username or email
-        const users = await db.query(
-            'SELECT id, username, email, password_hash, name, role, created_at FROM users WHERE username = ? OR email = ?',
-            [username, username]
-        );
+        let user = null;
+        let isValidPassword = false;
         
-        if (users.length === 0) {
-            // Increment failed attempts
-            const attempts = loginAttempts.get(clientIP) || { count: 0, resetTime: Date.now() + RATE_LIMIT_WINDOW };
-            attempts.count++;
-            loginAttempts.set(clientIP, attempts);
+        // Check demo credentials first (for original UI)
+        if (username === 'demo' && password === 'demo123') {
+            user = DEMO_CREDENTIALS.demo;
+            isValidPassword = true;
+            console.log(`✅ Demo user login: ${username}`);
+        } else if (username === 'admin' && password === 'admin123') {
+            user = DEMO_CREDENTIALS.admin;
+            isValidPassword = true;
+            console.log(`✅ Demo admin login: ${username}`);
+        } else {
+            // Check database users
+            const users = await db.query(
+                'SELECT id, username, email, password_hash, name, role, created_at, is_active FROM users WHERE (username = ? OR email = ?) AND is_active = true',
+                [username, username]
+            );
             
-            return res.status(401).json({ error: 'Invalid username or password' });
+            if (users.length > 0) {
+                user = users[0];
+                isValidPassword = await bcrypt.compare(password, user.password_hash);
+            }
         }
         
-        const user = users[0];
-        
-        // Check password
-        const isValidPassword = await bcrypt.compare(password, user.password_hash);
-        if (!isValidPassword) {
+        if (!user || !isValidPassword) {
             // Increment failed attempts
             const attempts = loginAttempts.get(clientIP) || { count: 0, resetTime: Date.now() + RATE_LIMIT_WINDOW };
             attempts.count++;
             loginAttempts.set(clientIP, attempts);
             
-            return res.status(401).json({ error: 'Invalid username or password' });
+            return res.status(401).json({ 
+                error: 'Invalid username or password',
+                uiHint: 'Try demo/demo123 or admin/admin123 for testing'
+            });
         }
         
         // Reset failed attempts on successful login
@@ -194,13 +272,19 @@ router.post('/login', rateLimitMiddleware, validateLogin, async (req, res) => {
             }
         );
         
-        // Update last login
-        await db.query(
-            'UPDATE users SET last_login = NOW() WHERE id = ?',
-            [user.id]
-        );
+        // Update last login for database users
+        if (user.id < 998) { // Not demo users
+            try {
+                await db.query(
+                    'UPDATE users SET last_login = NOW() WHERE id = ?',
+                    [user.id]
+                );
+            } catch (updateErr) {
+                console.error('Failed to update last_login:', updateErr);
+            }
+        }
         
-        console.log(`✅ User logged in: ${user.username} (ID: ${user.id})`);
+        console.log(`✅ User logged in: ${user.username} (${user.name || user.username}) - Role: ${user.role}`);
         
         res.json({
             token,
@@ -208,24 +292,33 @@ router.post('/login', rateLimitMiddleware, validateLogin, async (req, res) => {
                 id: user.id.toString(),
                 username: user.username,
                 email: user.email,
-                name: user.name,
+                name: user.name || user.username,
                 role: user.role,
-                createdAt: user.created_at
+                createdAt: user.created_at || new Date().toISOString()
             },
-            expiresIn: process.env.JWT_EXPIRES_IN || '24h'
+            expiresIn: process.env.JWT_EXPIRES_IN || '24h',
+            success: true,
+            welcomeMessage: `Welcome back, ${user.name || user.username}!`,
+            uiHint: 'Redirecting to main dashboard...'
         });
     } catch (err) {
         console.error('Login error:', err);
-        res.status(500).json({ error: 'Login failed. Please try again.' });
+        res.status(500).json({ 
+            error: 'Login failed. Please try again.',
+            uiHint: 'Check your internet connection'
+        });
     }
 });
 
-// Verify token endpoint
+// Verify token endpoint (enhanced for original UI)
 router.post('/verify', async (req, res) => {
     const token = req.headers.authorization?.replace('Bearer ', '');
     
     if (!token) {
-        return res.status(401).json({ error: 'No token provided' });
+        return res.status(401).json({ 
+            error: 'No token provided',
+            uiHint: 'Please login again'
+        });
     }
     
     try {
@@ -234,51 +327,82 @@ router.post('/verify', async (req, res) => {
             process.env.JWT_SECRET || 'smart_cart_secret_key_change_in_production'
         );
         
-        // Check if user still exists
-        const users = await db.query(
-            'SELECT id, username, email, name, role FROM users WHERE id = ?',
-            [decoded.id]
-        );
+        let user = null;
         
-        if (users.length === 0) {
-            return res.status(401).json({ error: 'User not found' });
+        // Check if it's a demo user
+        if (decoded.id === 999) {
+            user = DEMO_CREDENTIALS.demo;
+        } else if (decoded.id === 998) {
+            user = DEMO_CREDENTIALS.admin;
+        } else {
+            // Check database
+            const users = await db.query(
+                'SELECT id, username, email, name, role FROM users WHERE id = ? AND is_active = true',
+                [decoded.id]
+            );
+            
+            if (users.length > 0) {
+                user = users[0];
+            }
+        }
+        
+        if (!user) {
+            return res.status(401).json({ 
+                error: 'User not found or inactive',
+                uiHint: 'Please login again'
+            });
         }
         
         res.json({ 
             valid: true, 
             user: {
-                id: users[0].id.toString(),
-                username: users[0].username,
-                email: users[0].email,
-                name: users[0].name,
-                role: users[0].role
+                id: user.id.toString(),
+                username: user.username,
+                email: user.email,
+                name: user.name || user.username,
+                role: user.role
             }
         });
     } catch (err) {
         if (err.name === 'TokenExpiredError') {
-            return res.status(401).json({ error: 'Token expired' });
+            return res.status(401).json({ 
+                error: 'Token expired',
+                uiHint: 'Please login again'
+            });
         }
         if (err.name === 'JsonWebTokenError') {
-            return res.status(401).json({ error: 'Invalid token' });
+            return res.status(401).json({ 
+                error: 'Invalid token',
+                uiHint: 'Please login again'
+            });
         }
         
         console.error('Token verification error:', err);
-        res.status(500).json({ error: 'Token verification failed' });
+        res.status(500).json({ 
+            error: 'Token verification failed',
+            uiHint: 'Please try logging in again'
+        });
     }
 });
 
-// Logout endpoint (for token blacklisting in production)
+// Logout endpoint (enhanced for original UI)
 router.post('/logout', (req, res) => {
-    // In production, you would add the token to a blacklist
-    res.json({ message: 'Logged out successfully' });
+    res.json({ 
+        message: 'Logged out successfully', 
+        success: true,
+        uiHint: 'Redirecting to login screen...'
+    });
 });
 
-// Get current user profile
+// Get current user profile (enhanced for original UI)
 router.get('/profile', async (req, res) => {
     const token = req.headers.authorization?.replace('Bearer ', '');
     
     if (!token) {
-        return res.status(401).json({ error: 'No token provided' });
+        return res.status(401).json({ 
+            error: 'No token provided',
+            uiHint: 'Please login to view profile'
+        });
     }
     
     try {
@@ -287,29 +411,108 @@ router.get('/profile', async (req, res) => {
             process.env.JWT_SECRET || 'smart_cart_secret_key_change_in_production'
         );
         
-        const users = await db.query(
-            'SELECT id, username, email, name, role, created_at, last_login FROM users WHERE id = ?',
-            [decoded.id]
-        );
+        let user = null;
         
-        if (users.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
+        // Check demo users
+        if (decoded.id === 999) {
+            user = DEMO_CREDENTIALS.demo;
+        } else if (decoded.id === 998) {
+            user = DEMO_CREDENTIALS.admin;
+        } else {
+            const users = await db.query(
+                'SELECT id, username, email, name, role, created_at, last_login FROM users WHERE id = ? AND is_active = true',
+                [decoded.id]
+            );
+            
+            if (users.length > 0) {
+                user = users[0];
+            }
         }
         
-        const user = users[0];
+        if (!user) {
+            return res.status(404).json({ 
+                error: 'User not found',
+                uiHint: 'Please login again'
+            });
+        }
+        
         res.json({
             id: user.id.toString(),
             username: user.username,
             email: user.email,
-            name: user.name,
+            name: user.name || user.username,
             role: user.role,
-            createdAt: user.created_at,
-            lastLogin: user.last_login
+            createdAt: user.created_at || '2025-01-01T00:00:00.000Z',
+            lastLogin: user.last_login || new Date().toISOString(),
+            isDemoAccount: user.id >= 998
         });
     } catch (err) {
         console.error('Profile fetch error:', err);
-        res.status(401).json({ error: 'Invalid token' });
+        res.status(401).json({ 
+            error: 'Invalid token',
+            uiHint: 'Please login again'
+        });
     }
 });
+
+// Middleware to authenticate requests (enhanced for original UI)
+const authenticateToken = async (req, res, next) => {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    
+    if (!token) {
+        return res.status(401).json({ 
+            error: 'Access token required',
+            uiHint: 'Please login to access this feature'
+        });
+    }
+    
+    try {
+        const decoded = jwt.verify(
+            token, 
+            process.env.JWT_SECRET || 'smart_cart_secret_key_change_in_production'
+        );
+        
+        let user = null;
+        
+        // Check demo users
+        if (decoded.id === 999) {
+            user = DEMO_CREDENTIALS.demo;
+        } else if (decoded.id === 998) {
+            user = DEMO_CREDENTIALS.admin;
+        } else {
+            const users = await db.query(
+                'SELECT id, username, role FROM users WHERE id = ? AND is_active = true',
+                [decoded.id]
+            );
+            
+            if (users.length > 0) {
+                user = users[0];
+            }
+        }
+        
+        if (!user) {
+            return res.status(401).json({ 
+                error: 'User not found or inactive',
+                uiHint: 'Please login again'
+            });
+        }
+        
+        req.user = {
+            id: user.id,
+            username: user.username,
+            role: user.role
+        };
+        
+        next();
+    } catch (err) {
+        return res.status(401).json({ 
+            error: 'Invalid or expired token',
+            uiHint: 'Please login again'
+        });
+    }
+};
+
+// Export the authentication middleware for use in other routes
+router.authenticateToken = authenticateToken;
 
 module.exports = router;

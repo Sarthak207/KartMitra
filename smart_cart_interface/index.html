@@ -5,25 +5,271 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Cart Interface</title>
     <link rel="stylesheet" href="css/style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div id="app">
+        <!-- Loading Screen -->
         <div id="loading-screen" class="loading-screen">
             <div class="loading-content">
                 <div class="loading-spinner"></div>
                 <h2>Smart Cart Loading...</h2>
-                <p>Initializing your shopping experience</p>
+                <p>Connecting to your smart shopping experience...</p>
+            </div>
+        </div>
+        
+        <!-- Authentication Screen -->
+        <div id="auth-screen" class="auth-screen" style="display: none;">
+            <div class="auth-container">
+                <div class="auth-card">
+                    <div class="auth-header">
+                        <h2>🛒 Smart Cart</h2>
+                        <p>Your exclusive shopping companion</p>
+                    </div>
+                    
+                    <div class="auth-tabs">
+                        <button class="auth-tab active" data-tab="login">Login</button>
+                        <button class="auth-tab" data-tab="register">Register</button>
+                    </div>
+                    
+                    <!-- Login Form -->
+                    <div id="login-form" class="auth-form active">
+                        <h3>Welcome Back!</h3>
+                        <form id="login-form-element">
+                            <input type="text" name="username" placeholder="Username or Email" required>
+                            <input type="password" name="password" placeholder="Password" required>
+                            <button type="submit" class="auth-btn">Login</button>
+                        </form>
+                        <div class="auth-footer">
+                            <p>Demo Credentials:</p>
+                            <p>Username: demo | Password: demo123</p>
+                            <p>Admin: admin | Password: admin123</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Register Form -->
+                    <div id="register-form" class="auth-form">
+                        <h3>Create Account</h3>
+                        <form id="register-form-element">
+                            <input type="text" name="username" placeholder="Username" required>
+                            <input type="email" name="email" placeholder="Email" required>
+                            <input type="text" name="name" placeholder="Full Name" required>
+                            <input type="password" name="password" placeholder="Password" required>
+                            <button type="submit" class="auth-btn">Register</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Dashboard -->
+        <div id="main-dashboard" class="main-dashboard" style="display: none;">
+            <!-- Header -->
+            <header class="dashboard-header">
+                <div class="header-left">
+                    <h1>🛒 Smart Cart</h1>
+                    <span class="user-welcome">Welcome, <span id="username-display">Guest</span>!</span>
+                </div>
+                <div class="header-right">
+                    <div class="cart-indicator">
+                        <span class="cart-count" id="cart-count">0</span>
+                        <span>Items | ₹<span id="cart-total">0.00</span></span>
+                    </div>
+                    <button class="logout-btn" onclick="smartCart.logout()">Logout</button>
+                </div>
+            </header>
+            
+            <!-- Main Content Area -->
+            <div class="dashboard-content">
+                <!-- Home Screen -->
+                <div id="home-screen" class="screen active">
+                    <div class="home-container">
+                        <div class="home-buttons">
+                            <button class="home-btn" onclick="smartCart.showProducts()">
+                                <span class="btn-icon">🛍️</span>
+                                <span class="btn-text">Shop Products</span>
+                            </button>
+                            <button class="home-btn" onclick="smartCart.showCart()">
+                                <span class="btn-icon">🛒</span>
+                                <span class="btn-text">View Cart</span>
+                            </button>
+                            <button class="home-btn" onclick="smartCart.showMap()">
+                                <span class="btn-icon">🗺️</span>
+                                <span class="btn-text">Store Map</span>
+                            </button>
+                            <button class="home-btn" onclick="smartCart.showSettings()">
+                                <span class="btn-icon">⚙️</span>
+                                <span class="btn-text">Settings</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Products Screen -->
+                <div id="products-screen" class="screen">
+                    <div class="screen-header">
+                        <button class="back-btn" onclick="smartCart.showHome()">← Back</button>
+                        <h2>Shop Products</h2>
+                        <div class="cart-summary">
+                            <span id="cart-items-count">0</span> Items | ₹<span id="cart-total-display">0.00</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Category Filters -->
+                    <div class="category-filters">
+                        <button class="filter-btn active" data-category="all">All</button>
+                        <button class="filter-btn" data-category="fruits">Fruits</button>
+                        <button class="filter-btn" data-category="bakery">Bakery</button>
+                        <button class="filter-btn" data-category="dairy">Dairy</button>
+                        <button class="filter-btn" data-category="beverages">Beverages</button>
+                        <button class="filter-btn" data-category="meat">Meat</button>
+                    </div>
+                    
+                    <!-- Products Grid -->
+                    <div id="products-container" class="products-grid">
+                        <div class="loading-products">Loading products...</div>
+                    </div>
+                </div>
+                
+                <!-- Cart Screen -->
+                <div id="cart-screen" class="screen">
+                    <div class="screen-header">
+                        <button class="back-btn" onclick="smartCart.showHome()">← Back</button>
+                        <h2>Shopping Cart</h2>
+                        <button class="clear-cart-btn" onclick="smartCart.clearCart()">Clear All</button>
+                    </div>
+                    
+                    <div id="cart-container" class="cart-container">
+                        <div class="empty-cart">
+                            <h3>Your cart is empty</h3>
+                            <p>Add some products to get started!</p>
+                            <button class="shop-now-btn" onclick="smartCart.showProducts()">Shop Now</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Store Map Screen -->
+                <div id="map-screen" class="screen">
+                    <div class="screen-header">
+                        <button class="back-btn" onclick="smartCart.showHome()">← Back</button>
+                        <h2>Store Map</h2>
+                        <div class="map-legend">
+                            <span class="legend-item">🔴 You are here</span>
+                            <span class="legend-item">🟢 Product locations</span>
+                        </div>
+                    </div>
+                    
+                    <div class="store-map-container">
+                        <div class="store-map" id="store-map">
+                            <!-- Aisles will be dynamically generated -->
+                            <div class="aisle" data-aisle="1">
+                                <div class="aisle-label">Aisle 1</div>
+                                <div class="aisle-products" id="aisle-1-products"></div>
+                            </div>
+                            <div class="aisle" data-aisle="2">
+                                <div class="aisle-label">Aisle 2</div>
+                                <div class="aisle-products" id="aisle-2-products"></div>
+                            </div>
+                            <div class="aisle" data-aisle="3">
+                                <div class="aisle-label">Aisle 3</div>
+                                <div class="aisle-products" id="aisle-3-products"></div>
+                            </div>
+                            <div class="aisle" data-aisle="4">
+                                <div class="aisle-label">Aisle 4</div>
+                                <div class="aisle-products" id="aisle-4-products"></div>
+                            </div>
+                            <div class="aisle" data-aisle="5">
+                                <div class="aisle-label">Aisle 5</div>
+                                <div class="aisle-products" id="aisle-5-products"></div>
+                            </div>
+                            
+                            <!-- User location indicator -->
+                            <div class="user-location" id="user-location">
+                                <div class="location-dot"></div>
+                                <div class="location-path" id="location-path"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Settings Screen -->
+                <div id="settings-screen" class="screen">
+                    <div class="screen-header">
+                        <button class="back-btn" onclick="smartCart.showHome()">← Back</button>
+                        <h2>Settings</h2>
+                    </div>
+                    
+                    <div class="settings-container">
+                        <div class="settings-section">
+                            <h3>Account Information</h3>
+                            <div class="setting-item">
+                                <span>Username:</span>
+                                <span id="settings-username">-</span>
+                            </div>
+                            <div class="setting-item">
+                                <span>Email:</span>
+                                <span id="settings-email">-</span>
+                            </div>
+                            <div class="setting-item">
+                                <span>Member Since:</span>
+                                <span id="settings-member-since">-</span>
+                            </div>
+                        </div>
+                        
+                        <div class="settings-section">
+                            <h3>Preferences</h3>
+                            <div class="setting-item">
+                                <span>Currency:</span>
+                                <select id="currency-select">
+                                    <option value="INR">₹ Indian Rupee</option>
+                                    <option value="USD">$ US Dollar</option>
+                                </select>
+                            </div>
+                            <div class="setting-item">
+                                <span>Notifications:</span>
+                                <input type="checkbox" id="notifications-toggle" checked>
+                            </div>
+                        </div>
+                        
+                        <div class="settings-section">
+                            <h3>Actions</h3>
+                            <button class="settings-btn" onclick="smartCart.exportData()">Export Data</button>
+                            <button class="settings-btn danger" onclick="smartCart.deleteAccount()">Delete Account</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Messages -->
+        <div id="success-message" class="message success-message" style="display: none;"></div>
+        <div id="error-message" class="message error-message" style="display: none;"></div>
+        <div id="add-to-cart-feedback" class="message feedback-message" style="display: none;"></div>
+        
+        <!-- Product Detail Modal -->
+        <div id="product-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modal-product-name">Product Name</h3>
+                    <button class="modal-close" onclick="smartCart.closeProductModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="product-details">
+                        <div class="product-image-large" id="modal-product-image">📦</div>
+                        <div class="product-info">
+                            <p class="product-price" id="modal-product-price">₹0.00</p>
+                            <p class="product-category" id="modal-product-category">Category</p>
+                            <p class="product-location" id="modal-product-location">Location</p>
+                            <p class="product-stock" id="modal-product-stock">Stock: 0</p>
+                        </div>
+                    </div>
+                    <div class="modal-actions">
+                        <button class="add-to-cart-btn" id="modal-add-to-cart">Add to Cart</button>
+                        <button class="find-on-map-btn" id="modal-find-on-map">Find on Map</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-    
-    <!-- Success/Error Message Container -->
-    <div id="success-message" class="message success-message" style="display: none;"></div>
-    <div id="error-message" class="message error-message" style="display: none;"></div>
-    <div id="add-to-cart-feedback" class="message feedback-message" style="display: none;"></div>
     
     <script src="js/app.js"></script>
 </body>
