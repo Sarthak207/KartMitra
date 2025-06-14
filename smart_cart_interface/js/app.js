@@ -1,4 +1,4 @@
-// Smart Cart Frontend - Exact Recreation of Original Design with Backend Integration
+// Smart Cart Frontend - Enhanced with Admin Redirect
 
 function SmartCartApp() {
     this.currentUser = null;
@@ -22,7 +22,6 @@ function SmartCartApp() {
 
 SmartCartApp.prototype.init = function() {
     var self = this;
-    // Hide loading screen after initialization
     setTimeout(function() {
         var loadingScreen = document.getElementById('loading-screen');
         if (loadingScreen) {
@@ -39,13 +38,19 @@ SmartCartApp.prototype.checkAuthStatus = function() {
     if (user && token) {
         this.currentUser = JSON.parse(user);
         this.isAdmin = this.currentUser.role === 'admin';
+        
+        // ADMIN REDIRECT LOGIC
+        if (this.isAdmin) {
+            window.location.href = 'admin_dashboard.html';
+            return;
+        }
+        
         this.showMainDashboard();
     } else {
         this.showAuthScreen();
     }
 };
 
-// Authentication Screen - Exact Recreation
 SmartCartApp.prototype.showAuthScreen = function() {
     var authScreen = document.getElementById('auth-screen');
     var mainDashboard = document.getElementById('main-dashboard');
@@ -126,7 +131,16 @@ SmartCartApp.prototype.handleLogin = function(event) {
             self.currentUser = data.user;
             self.isAdmin = data.user.role === 'admin';
             self.showSuccessMessage('Login successful! Welcome back!');
-            setTimeout(function() { self.showMainDashboard(); }, 1000);
+            
+            if (self.isAdmin) {
+                setTimeout(function() { 
+                    window.location.href = 'admin_dashboard.html';
+                }, 1000);
+            } else {
+                setTimeout(function() { 
+                    self.showMainDashboard(); 
+                }, 1500);
+            }
         } else {
             self.showErrorMessage(data.error || 'Login failed');
         }
@@ -182,7 +196,6 @@ SmartCartApp.prototype.handleRegister = function(event) {
     });
 };
 
-// Main Dashboard - Exact Recreation
 SmartCartApp.prototype.showMainDashboard = function() {
     var authScreen = document.getElementById('auth-screen');
     var mainDashboard = document.getElementById('main-dashboard');
@@ -202,7 +215,7 @@ SmartCartApp.prototype.showMainDashboard = function() {
     this.showHome();
 };
 
-// Navigation Functions - Exact Recreation
+// Navigation Functions
 SmartCartApp.prototype.showHome = function() {
     this.switchScreen('home');
 };
@@ -242,7 +255,7 @@ SmartCartApp.prototype.switchScreen = function(screenName) {
     this.currentScreen = screenName;
 };
 
-// Products Functions - Exact Recreation with Category Filters
+// Products Functions
 SmartCartApp.prototype.loadProducts = function() {
     var self = this;
     var container = document.getElementById('products-container');
@@ -339,7 +352,7 @@ SmartCartApp.prototype.getProductEmoji = function(category) {
     return emojis[category?.toLowerCase()] || '📦';
 };
 
-// Cart Functions - Exact Recreation
+// Cart Functions
 SmartCartApp.prototype.loadCart = function() {
     var self = this;
     var userId = this.currentUser ? this.currentUser.id : null;
@@ -375,9 +388,10 @@ SmartCartApp.prototype.renderCart = function() {
         return;
     }
     
+    var self = this;
     var cartItemsHTML = this.cart.map(function(item) {
         var subtotal = parseFloat(item.subtotal || (item.price * item.quantity));
-        var emoji = this.getProductEmoji(item.category);
+        var emoji = self.getProductEmoji(item.category);
         
         return `
             <div class="cart-item">
@@ -395,7 +409,7 @@ SmartCartApp.prototype.renderCart = function() {
                 <button class="remove-btn" onclick="smartCart.removeFromCart(${item.cart_item_id})">Remove</button>
             </div>
         `;
-    }.bind(this)).join('');
+    }).join('');
     
     container.innerHTML = `
         ${cartItemsHTML}
@@ -514,7 +528,7 @@ SmartCartApp.prototype.clearCart = function() {
         });
 };
 
-// Store Map Functions - Exact Recreation
+// Store Map Functions
 SmartCartApp.prototype.renderStoreMap = function() {
     var self = this;
     
@@ -625,11 +639,12 @@ SmartCartApp.prototype.checkout = function() {
 
 SmartCartApp.prototype.logout = function() {
     if (confirm('Are you sure you want to logout?')) {
-        localStorage.clear();
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
         this.currentUser = null;
         this.cart = [];
         this.totalAmount = 0;
-        this.showAuthScreen();
+        window.location.href = 'index.html';
     }
 };
 
@@ -683,6 +698,27 @@ SmartCartApp.prototype.exportData = function() {
 SmartCartApp.prototype.deleteAccount = function() {
     if (confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
         this.showErrorMessage('Account deletion feature coming soon');
+    }
+};
+
+SmartCartApp.prototype.showProductModal = function(product) {
+    var modal = document.getElementById('product-modal');
+    if (modal) {
+        document.getElementById('modal-product-name').textContent = product.name;
+        document.getElementById('modal-product-price').textContent = '₹' + parseFloat(product.price).toFixed(2);
+        document.getElementById('modal-product-category').textContent = product.category || 'General';
+        document.getElementById('modal-product-location').textContent = product.location || 'Store';
+        document.getElementById('modal-product-stock').textContent = 'Stock: ' + (product.stock || 0);
+        document.getElementById('modal-product-image').textContent = this.getProductEmoji(product.category);
+        
+        modal.style.display = 'block';
+    }
+};
+
+SmartCartApp.prototype.closeProductModal = function() {
+    var modal = document.getElementById('product-modal');
+    if (modal) {
+        modal.style.display = 'none';
     }
 };
 

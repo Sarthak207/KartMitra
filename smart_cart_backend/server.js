@@ -1,18 +1,18 @@
-// server.js - Smart Cart Backend API Server (Optimized for Original UI)
+// server.js - Smart Cart Backend API Server with File Upload Support
 BigInt.prototype.toJSON = function () { return this.toString(); };
 
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 
-// Enhanced CORS configuration for Smart Cart Original UI
+// Enhanced CORS configuration for Smart Cart with file uploads
 const corsOptions = {
     origin: function (origin, callback) {
-        // Allow requests with no origin (file://, mobile apps, Postman)
         if (!origin) return callback(null, true);
         
         const allowedOrigins = [
@@ -23,10 +23,9 @@ const corsOptions = {
             'http://localhost:5000',
             'http://127.0.0.1:5000',
             'file://',
-            'null' // This handles file:// protocol for local development
+            'null'
         ];
         
-        // In development, allow all origins for smart cart features
         if (NODE_ENV === 'development') {
             return callback(null, true);
         }
@@ -57,10 +56,13 @@ app.options('*', (req, res) => {
 });
 
 // Other middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Request logging optimized for original UI debugging
+// Static file serving for uploaded images
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Request logging
 app.use((req, res, next) => {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] ${req.method} ${req.url} - Origin: ${req.get('Origin') || 'null'}`);
@@ -74,21 +76,24 @@ app.get('/health', (req, res) => {
         timestamp: new Date().toISOString(),
         environment: NODE_ENV,
         version: '1.0.0',
-        service: 'Smart Cart API - Original UI Compatible',
+        service: 'Smart Cart API - With File Upload Support',
         features: {
             storeMap: '5 aisles with product locations',
             categoryFilters: 'All, Fruits, Bakery, Dairy, Beverages, Meat',
             findOnMap: 'Product location highlighting',
-            authentication: 'Login/Register with demo credentials'
+            authentication: 'Login/Register with demo credentials',
+            fileUpload: 'Product images and bulk CSV upload',
+            bulkImport: 'Multiple products upload via CSV'
         }
     });
 });
 
-// API Routes for Smart Cart Original UI functionality
+// API Routes for Smart Cart functionality
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/products', require('./routes/products'));
 app.use('/api/cart', require('./routes/cart'));
 app.use('/api/orders', require('./routes/orders'));
+app.use('/api/admin', require('./routes/admin'));
 
 // Store mapping endpoint for original UI 5-aisle layout
 app.get('/api/store/layout', (req, res) => {
@@ -119,23 +124,6 @@ app.get('/api/categories', (req, res) => {
     });
 });
 
-// Product location endpoint for "Find on Map" feature
-app.get('/api/products/:id/location', (req, res) => {
-    const { id } = req.params;
-    
-    // This will be enhanced by your products route
-    res.json({
-        productId: id,
-        aisle: 1, // Will be determined by category
-        position: { x: 100, y: 150 },
-        highlighted: true,
-        path: [
-            { x: 50, y: 400 },   // User location
-            { x: 100, y: 150 }   // Product location
-        ]
-    });
-});
-
 // Demo credentials endpoint for original UI login
 app.get('/api/demo-credentials', (req, res) => {
     res.json({
@@ -155,16 +143,18 @@ app.get('/api/demo-credentials', (req, res) => {
 // Basic route
 app.get('/', (req, res) => {
     res.json({ 
-        message: 'Smart Cart API Server Running - Original UI Compatible',
+        message: 'Smart Cart API Server Running - With File Upload Support',
         version: '1.0.0',
         environment: NODE_ENV,
-        originalUIFeatures: [
+        features: [
             '5-Aisle Store Map with Product Dots',
             'Category Filters: All, Fruits, Bakery, Dairy, Beverages, Meat',
             'Find on Map Product Location',
             'Green Theme Authentication',
             'Real-time Cart Updates',
-            'Demo Credentials Support'
+            'Demo Credentials Support',
+            'Product Image Upload',
+            'Bulk Product Import via CSV'
         ],
         cors: 'Enabled for file:// and all localhost origins'
     });
@@ -173,23 +163,24 @@ app.get('/', (req, res) => {
 // API documentation endpoint
 app.get('/api', (req, res) => {
     res.json({
-        name: 'Smart Cart API - Original UI',
+        name: 'Smart Cart API - With File Upload',
         version: '1.0.0',
-        description: 'Backend optimized for original green-themed SmartCart interface',
+        description: 'Backend optimized for original green-themed SmartCart interface with file upload capabilities',
         endpoints: {
             auth: '/api/auth - Authentication with demo credentials',
-            products: '/api/products - Product management with category filtering',
+            products: '/api/products - Product management with image upload',
             cart: '/api/cart - Shopping cart operations with real-time updates',
             orders: '/api/orders - Order processing',
+            admin: '/api/admin - Admin features with bulk upload',
             store: '/api/store/layout - 5-aisle store map layout',
             categories: '/api/categories - Category filters for original UI',
             demo: '/api/demo-credentials - Demo login credentials'
         },
-        originalUISupport: {
-            storeMap: '5 aisles with product location dots',
-            categoryFilters: 'All, Fruits, Bakery, Dairy, Beverages, Meat',
-            findOnMap: 'Product highlighting and pathfinding',
-            authentication: 'Demo credentials for testing'
+        fileUploadSupport: {
+            productImages: 'JPEG, PNG, WebP up to 5MB',
+            bulkImport: 'CSV files with product data',
+            maxFileSize: '5MB per file',
+            supportedFormats: ['image/jpeg', 'image/png', 'image/webp', 'text/csv']
         }
     });
 });
@@ -202,20 +193,38 @@ app.use('/api/*', (req, res) => {
         method: req.method,
         availableEndpoints: [
             '/api/auth - Authentication',
-            '/api/products - Product management', 
+            '/api/products - Product management with images', 
             '/api/cart - Cart operations',
             '/api/orders - Order processing',
+            '/api/admin - Admin features with bulk upload',
             '/api/store/layout - Store map',
             '/api/categories - Category filters',
             '/api/demo-credentials - Demo login'
         ],
-        note: 'This API is optimized for the original SmartCart UI design'
+        note: 'This API supports file uploads for product images and bulk CSV import'
     });
 });
 
 // Global error handler
 app.use((err, req, res, next) => {
     console.error('Error:', err);
+    
+    // Handle file upload errors
+    if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+            error: 'File too large',
+            message: 'Maximum file size is 5MB',
+            uiHint: 'Please choose a smaller image file'
+        });
+    }
+    
+    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+        return res.status(400).json({
+            error: 'Unexpected file field',
+            message: 'Invalid file upload field',
+            uiHint: 'Please check the file upload form'
+        });
+    }
     
     // Handle specific error types for original UI
     if (err.name === 'ValidationError') {
@@ -241,7 +250,7 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Start server with original UI compatibility messages
+// Start server with file upload support
 const server = app.listen(PORT, () => {
     console.log(`🚀 Smart Cart API Server running on port ${PORT}`);
     console.log(`📍 Environment: ${NODE_ENV}`);
@@ -254,6 +263,9 @@ const server = app.listen(PORT, () => {
     console.log(`   ✅ Find on Map Product Location`);
     console.log(`   ✅ Green Theme Authentication`);
     console.log(`   ✅ Demo Credentials: demo/demo123, admin/admin123`);
+    console.log(`   ✅ Product Image Upload Support`);
+    console.log(`   ✅ Bulk Product Import via CSV`);
+    console.log(`📁 Static files served from: http://localhost:${PORT}/uploads/`);
     console.log(`🎨 Optimized for Original SmartCart Interface Design`);
 });
 

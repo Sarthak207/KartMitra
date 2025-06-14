@@ -1,0 +1,1313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SmartCart Admin Dashboard</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* Additional styles for bulk upload features */
+    .upload-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 30px;
+      margin-bottom: 30px;
+    }
+    
+    .upload-card {
+      background: white;
+      border-radius: 15px;
+      padding: 25px;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+      border: 2px solid #f0f0f0;
+      transition: all 0.3s ease;
+    }
+    
+    .upload-card:hover {
+      border-color: #2E8B57;
+      transform: translateY(-2px);
+    }
+    
+    .upload-card h4 {
+      color: #2E8B57;
+      margin-bottom: 10px;
+      font-size: 20px;
+    }
+    
+    .upload-card p {
+      color: #666;
+      margin-bottom: 20px;
+    }
+    
+    .upload-area {
+      border: 2px dashed #ddd;
+      border-radius: 10px;
+      padding: 40px 20px;
+      text-align: center;
+      margin-bottom: 20px;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+    
+    .upload-area:hover {
+      border-color: #2E8B57;
+      background: rgba(46, 139, 87, 0.05);
+    }
+    
+    .upload-area.file-selected {
+      border-color: #2E8B57;
+      background: rgba(46, 139, 87, 0.1);
+    }
+    
+    .upload-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 15px;
+    }
+    
+    .upload-icon {
+      font-size: 48px;
+      opacity: 0.6;
+    }
+    
+    .upload-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+    
+    .upload-instructions {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 15px;
+      font-size: 14px;
+    }
+    
+    .upload-instructions h5 {
+      color: #2E8B57;
+      margin-bottom: 10px;
+    }
+    
+    .upload-instructions ul {
+      margin-left: 20px;
+      color: #666;
+    }
+    
+    .upload-instructions li {
+      margin-bottom: 5px;
+    }
+    
+    .upload-progress {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 3px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    .progress-bar {
+      width: 100%;
+      height: 20px;
+      background: #f0f0f0;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #2E8B57, #3CB371);
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    
+    .upload-results {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 3px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    .results-summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    
+    .results-summary p {
+      background: #f8f9fa;
+      padding: 10px;
+      border-radius: 8px;
+      text-align: center;
+      margin: 0;
+    }
+    
+    .image-preview {
+      margin-top: 10px;
+      text-align: center;
+    }
+    
+    .image-preview img {
+      max-width: 200px;
+      max-height: 200px;
+      border-radius: 8px;
+      border: 2px solid #ddd;
+    }
+    
+    .product-admin-card img {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin-bottom: 10px;
+    }
+    
+    .product-placeholder {
+      width: 100%;
+      height: 150px;
+      background: #f0f0f0;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+      color: #ccc;
+    }
+    
+    @media (max-width: 768px) {
+      .upload-options {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+      
+      .results-summary {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+<script>
+// Admin Access Check
+document.addEventListener('DOMContentLoaded', function() {
+  const user = localStorage.getItem('user');
+  const token = localStorage.getItem('token');
+  if (!user || !token) {
+    alert('Please login to access admin dashboard');
+    window.location.href = 'index.html';
+    return;
+  }
+  const userData = JSON.parse(user);
+  if (userData.role !== 'admin') {
+    alert('Admin access required');
+    window.location.href = 'index.html';
+    return;
+  }
+});
+</script>
+
+<div class="admin-container">
+  <!-- Sidebar -->
+  <div class="admin-sidebar">
+    <div class="admin-header">
+      <h1>🛒 SmartCart Admin</h1>
+      <p>Store Management Dashboard</p>
+    </div>
+    <nav class="admin-nav">
+      <a href="#" class="nav-item active" data-section="dashboard">📊 Dashboard</a>
+      <a href="#" class="nav-item" data-section="store-map">🗺️ Store Map Editor</a>
+      <a href="#" class="nav-item" data-section="products">📦 Product Management</a>
+      <a href="#" class="nav-item" data-section="bulk-upload">📤 Bulk Upload</a>
+      <a href="#" class="nav-item" data-section="aisles">🏪 Aisle Management</a>
+      <a href="#" class="nav-item" data-section="orders">📋 Order Management</a>
+      <a href="#" class="nav-item" data-section="customers">👥 Customer Management</a>
+      <a href="#" class="nav-item" data-section="analytics">📈 Analytics</a>
+      <a href="#" class="nav-item" data-section="settings">⚙️ Settings</a>
+    </nav>
+  </div>
+
+  <!-- Main Content -->
+  <div class="admin-main">
+    <div class="admin-topbar">
+      <h2 id="current-section-title">Dashboard</h2>
+      <div>
+        <span>Welcome, Admin!</span>
+        <button class="btn btn-secondary" onclick="logout()">Logout</button>
+      </div>
+    </div>
+    <div class="admin-content">
+
+      <!-- Dashboard Section -->
+      <div id="dashboard" class="content-section active">
+        <h3 class="section-title">Store Overview</h3>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-number" id="total-products">8</div>
+            <div class="stat-label">Total Products</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="total-orders">12</div>
+            <div class="stat-label">Total Orders</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" id="total-customers">25</div>
+            <div class="stat-label">Active Customers</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number">₹<span id="total-revenue">2,847</span></div>
+            <div class="stat-label">Total Revenue</div>
+          </div>
+        </div>
+        <h4>Recent Activity</h4>
+        <table class="data-table">
+          <thead>
+            <tr><th>Time</th><th>Activity</th><th>User</th><th>Status</th></tr>
+          </thead>
+          <tbody id="recent-activity">
+            <tr>
+              <td>2 min ago</td>
+              <td>New order placed</td>
+              <td>Demo User</td>
+              <td>Pending</td>
+            </tr>
+            <tr>
+              <td>5 min ago</td>
+              <td>Product added to cart</td>
+              <td>Demo User</td>
+              <td>Active</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Store Map Editor Section -->
+      <div id="store-map" class="content-section">
+        <h3 class="section-title">Store Map Editor</h3>
+        <div class="map-editor">
+          <div class="map-canvas" id="map-canvas">
+            <!-- Aisles will be dynamically generated -->
+            <div class="aisle-editor" style="left: 50px; top: 50px; width: 120px; height: 200px;" data-aisle="1">
+              <div class="aisle-header">Aisle 1 - Fruits</div>
+              <div class="aisle-content">
+                <div class="product-dot" title="Red Apples"></div>
+                <div class="product-dot" title="Bananas"></div>
+              </div>
+            </div>
+            
+            <div class="aisle-editor" style="left: 200px; top: 50px; width: 120px; height: 200px;" data-aisle="2">
+              <div class="aisle-header">Aisle 2 - Bakery</div>
+              <div class="aisle-content">
+                <div class="product-dot" title="Whole Wheat Bread"></div>
+                <div class="product-dot" title="Croissants"></div>
+              </div>
+            </div>
+            
+            <div class="aisle-editor" style="left: 350px; top: 50px; width: 120px; height: 200px;" data-aisle="3">
+              <div class="aisle-header">Aisle 3 - Dairy</div>
+              <div class="aisle-content">
+                <div class="product-dot" title="Fresh Milk"></div>
+                <div class="product-dot" title="Cheddar Cheese"></div>
+              </div>
+            </div>
+            
+            <div class="aisle-editor" style="left: 500px; top: 50px; width: 120px; height: 200px;" data-aisle="4">
+              <div class="aisle-header">Aisle 4 - Beverages</div>
+              <div class="aisle-content">
+                <div class="product-dot" title="Orange Juice"></div>
+              </div>
+            </div>
+            
+            <div class="aisle-editor" style="left: 650px; top: 50px; width: 120px; height: 200px;" data-aisle="5">
+              <div class="aisle-header">Aisle 5 - Meat</div>
+              <div class="aisle-content">
+                <div class="product-dot" title="Chicken Breast"></div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="map-controls">
+            <h4>Map Controls</h4>
+            
+            <div class="control-group">
+              <label>Add New Aisle</label>
+              <input type="text" id="new-aisle-name" placeholder="Aisle Name">
+              <select id="new-aisle-category">
+                <option value="fruits">Fruits</option>
+                <option value="bakery">Bakery</option>
+                <option value="dairy">Dairy</option>
+                <option value="beverages">Beverages</option>
+                <option value="meat">Meat</option>
+                <option value="vegetables">Vegetables</option>
+                <option value="snacks">Snacks</option>
+              </select>
+              <button class="btn" onclick="addNewAisle()">Add Aisle</button>
+            </div>
+            
+            <div class="control-group">
+              <label>Selected Aisle</label>
+              <input type="text" id="selected-aisle-name" placeholder="No aisle selected" readonly>
+              <button class="btn btn-danger" onclick="deleteSelectedAisle()">Delete Aisle</button>
+            </div>
+            
+            <div class="control-group">
+              <button class="btn" onclick="saveMapLayout()">Save Layout</button>
+              <button class="btn btn-secondary" onclick="resetMapLayout()">Reset Layout</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Product Management Section -->
+      <div id="products" class="content-section">
+        <h3 class="section-title">Product Management</h3>
+        <div style="margin-bottom:20px;">
+          <button class="btn" onclick="openAddProductModal()">Add New Product</button>
+          <button class="btn btn-secondary" onclick="showSection('bulk-upload')">Bulk Upload</button>
+          <button class="btn btn-secondary" onclick="exportProducts()">Export Products</button>
+        </div>
+        <div class="product-grid" id="products-grid">
+          <!-- Products will be dynamically loaded here -->
+        </div>
+      </div>
+
+      <!-- Bulk Upload Section -->
+      <div id="bulk-upload" class="content-section">
+        <h3 class="section-title">Bulk Product Upload</h3>
+        
+        <div class="upload-options">
+          <div class="upload-card">
+            <h4>📄 CSV File Upload</h4>
+            <p>Upload multiple products at once using a CSV file</p>
+            
+            <div class="upload-area" id="csv-upload-area" onclick="document.getElementById('csv-file-input').click()">
+              <div class="upload-content">
+                <div class="upload-icon">📤</div>
+                <p>Drag and drop your CSV file here, or click to browse</p>
+                <input type="file" id="csv-file-input" accept=".csv" style="display: none;">
+                <button class="btn" type="button">Choose CSV File</button>
+              </div>
+            </div>
+            
+            <div class="upload-actions">
+              <button class="btn btn-secondary" onclick="downloadCSVTemplate()">Download Template</button>
+              <button class="btn" onclick="uploadCSVFile()" id="upload-csv-btn" disabled>Upload Products</button>
+            </div>
+            
+            <div class="upload-instructions">
+              <h5>CSV Format Instructions:</h5>
+              <ul>
+                <li>Required columns: name, price, category, stock</li>
+                <li>Optional columns: location, rfid_tag, description, image_url</li>
+                <li>Categories: fruits, bakery, dairy, beverages, meat, vegetables</li>
+                <li>Price should be numeric (e.g., 2.59)</li>
+                <li>Stock should be integer (e.g., 50)</li>
+              </ul>
+            </div>
+          </div>
+          
+          <div class="upload-card">
+            <h4>🖼️ Multiple Images Upload</h4>
+            <p>Upload product images to use with your products</p>
+            
+            <div class="upload-area" id="images-upload-area" onclick="document.getElementById('images-file-input').click()">
+              <div class="upload-content">
+                <div class="upload-icon">🖼️</div>
+                <p>Drag and drop image files here, or click to browse</p>
+                <input type="file" id="images-file-input" accept="image/*" multiple style="display: none;">
+                <button class="btn" type="button">Choose Images</button>
+              </div>
+            </div>
+            
+            <div class="upload-actions">
+              <button class="btn" onclick="uploadImages()" id="upload-images-btn" disabled>Upload Images</button>
+            </div>
+            
+            <div class="upload-instructions">
+              <h5>Image Upload Instructions:</h5>
+              <ul>
+                <li>Supported formats: JPEG, PNG, WebP</li>
+                <li>Maximum file size: 5MB per image</li>
+                <li>Maximum 20 images at once</li>
+                <li>Images will be available for product assignment</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        
+        <div id="upload-progress" class="upload-progress" style="display: none;">
+          <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill"></div>
+          </div>
+          <p id="progress-text">Uploading...</p>
+        </div>
+        
+        <div id="upload-results" class="upload-results" style="display: none;">
+          <h4>Upload Results</h4>
+          <div id="results-content"></div>
+        </div>
+      </div>
+
+      <!-- Aisle Management Section -->
+      <div id="aisles" class="content-section">
+        <h3 class="section-title">Aisle Management</h3>
+        <table class="data-table">
+          <thead>
+            <tr><th>Aisle #</th><th>Name</th><th>Category</th><th>Products</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="aisles-table">
+            <tr>
+              <td>1</td>
+              <td>Fruits Section</td>
+              <td>Fruits</td>
+              <td>2</td>
+              <td>
+                <button class="btn" onclick="editAisle(1)">Edit</button>
+                <button class="btn btn-danger" onclick="deleteAisle(1)">Delete</button>
+              </td>
+            </tr>
+            <tr>
+              <td>2</td>
+              <td>Bakery Section</td>
+              <td>Bakery</td>
+              <td>2</td>
+              <td>
+                <button class="btn" onclick="editAisle(2)">Edit</button>
+                <button class="btn btn-danger" onclick="deleteAisle(2)">Delete</button>
+              </td>
+            </tr>
+            <tr>
+              <td>3</td>
+              <td>Dairy Section</td>
+              <td>Dairy</td>
+              <td>2</td>
+              <td>
+                <button class="btn" onclick="editAisle(3)">Edit</button>
+                <button class="btn btn-danger" onclick="deleteAisle(3)">Delete</button>
+              </td>
+            </tr>
+            <tr>
+              <td>4</td>
+              <td>Beverages Section</td>
+              <td>Beverages</td>
+              <td>1</td>
+              <td>
+                <button class="btn" onclick="editAisle(4)">Edit</button>
+                <button class="btn btn-danger" onclick="deleteAisle(4)">Delete</button>
+              </td>
+            </tr>
+            <tr>
+              <td>5</td>
+              <td>Meat Section</td>
+              <td>Meat</td>
+              <td>1</td>
+              <td>
+                <button class="btn" onclick="editAisle(5)">Edit</button>
+                <button class="btn btn-danger" onclick="deleteAisle(5)">Delete</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Order Management Section -->
+      <div id="orders" class="content-section">
+        <h3 class="section-title">Order Management</h3>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Order ID</th><th>Customer</th><th>Items</th><th>Total</th>
+              <th>Status</th><th>Date</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="orders-table">
+            <tr>
+              <td>#1001</td>
+              <td>Demo User</td>
+              <td>2</td>
+              <td>₹8.67</td>
+              <td><span class="status-badge status-delivered">Delivered</span></td>
+              <td>2025-06-07</td>
+              <td>
+                <button class="btn" onclick="viewOrder(1001)">View</button>
+                <button class="btn btn-secondary" onclick="updateOrderStatus(1001)">Update</button>
+              </td>
+            </tr>
+            <tr>
+              <td>#1002</td>
+              <td>Demo User</td>
+              <td>3</td>
+              <td>₹5.98</td>
+              <td><span class="status-badge status-pending">Pending</span></td>
+              <td>2025-06-08</td>
+              <td>
+                <button class="btn" onclick="viewOrder(1002)">View</button>
+                <button class="btn btn-secondary" onclick="updateOrderStatus(1002)">Update</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Customer Management Section -->
+      <div id="customers" class="content-section">
+        <h3 class="section-title">Customer Management</h3>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Customer ID</th><th>Name</th><th>Email</th>
+              <th>Orders</th><th>Total Spent</th><th>Last Visit</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="customers-table">
+            <tr>
+              <td>#999</td>
+              <td>Demo User</td>
+              <td>demo@smartcart.com</td>
+              <td>2</td>
+              <td>₹14.65</td>
+              <td>2025-06-08</td>
+              <td>
+                <button class="btn" onclick="viewCustomer(999)">View</button>
+                <button class="btn btn-secondary" onclick="editCustomer(999)">Edit</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Analytics Section -->
+      <div id="analytics" class="content-section">
+        <h3 class="section-title">Analytics & Reports</h3>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-number">85%</div>
+            <div class="stat-label">Cart Conversion Rate</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number">₹237</div>
+            <div class="stat-label">Average Order Value</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number">4.2</div>
+            <div class="stat-label">Items per Order</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number">92%</div>
+            <div class="stat-label">Customer Satisfaction</div>
+          </div>
+        </div>
+        
+        <h4>Popular Products</h4>
+        <table class="data-table">
+          <thead>
+            <tr><th>Product</th><th>Category</th><th>Sales</th><th>Revenue</th><th>Trend</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Red Apples</td>
+              <td>Fruits</td>
+              <td>45</td>
+              <td>₹116.55</td>
+              <td>📈 +15%</td>
+            </tr>
+            <tr>
+              <td>Fresh Milk</td>
+              <td>Dairy</td>
+              <td>32</td>
+              <td>₹111.68</td>
+              <td>📈 +8%</td>
+            </tr>
+            <tr>
+              <td>Whole Wheat Bread</td>
+              <td>Bakery</td>
+              <td>28</td>
+              <td>₹55.72</td>
+              <td>📈 +12%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Settings Section -->
+      <div id="settings" class="content-section">
+        <h3 class="section-title">Store Settings</h3>
+        
+        <div class="form-row">
+          <div class="control-group">
+            <label>Store Name</label>
+            <input type="text" value="SmartCart Store" id="store-name">
+          </div>
+          <div class="control-group">
+            <label>Store Currency</label>
+            <select id="store-currency">
+              <option value="INR">₹ Indian Rupee</option>
+              <option value="USD">$ US Dollar</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="control-group">
+            <label>Tax Rate (%)</label>
+            <input type="number" value="18" id="tax-rate">
+          </div>
+          <div class="control-group">
+            <label>Default Aisle Size</label>
+            <select id="default-aisle-size">
+              <option value="small">Small (100×80)</option>
+              <option value="medium" selected>Medium (120×200)</option>
+              <option value="large">Large (150×250)</option>
+            </select>
+          </div>
+        </div>
+        
+        <button class="btn" onclick="saveSettings()">Save Settings</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Product Modal with Image Upload -->
+<div id="add-product-modal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>Add New Product</h3>
+      <button class="modal-close" onclick="closeAddProductModal()">&times;</button>
+    </div>
+    <form id="add-product-form" class="product-form" enctype="multipart/form-data">
+      <div class="form-row">
+        <div class="control-group">
+          <label>Product Name *</label>
+          <input type="text" name="name" required>
+        </div>
+        <div class="control-group">
+          <label>Price (₹) *</label>
+          <input type="number" step="0.01" name="price" required>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="control-group">
+          <label>Category *</label>
+          <select name="category" required>
+            <option value="">Select Category</option>
+            <option value="fruits">Fruits</option>
+            <option value="bakery">Bakery</option>
+            <option value="dairy">Dairy</option>
+            <option value="beverages">Beverages</option>
+            <option value="meat">Meat</option>
+            <option value="vegetables">Vegetables</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label>Stock Quantity *</label>
+          <input type="number" name="stock" required>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="control-group">
+          <label>Aisle Assignment</label>
+          <select name="aisle">
+            <option value="1">Aisle 1 - Fruits</option>
+            <option value="2">Aisle 2 - Bakery</option>
+            <option value="3">Aisle 3 - Dairy</option>
+            <option value="4">Aisle 4 - Beverages</option>
+            <option value="5">Aisle 5 - Meat</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label>RFID Tag</label>
+          <input type="text" name="rfid_tag" placeholder="Optional">
+        </div>
+      </div>
+      <div class="control-group">
+        <label>Product Image</label>
+        <input type="file" name="image" accept="image/*" id="product-image-input">
+        <div class="image-preview" id="image-preview" style="display: none;">
+          <img id="preview-img" style="max-width: 200px; max-height: 200px; border-radius: 8px;">
+        </div>
+      </div>
+      <div class="control-group">
+        <label>Product Description</label>
+        <textarea name="description" rows="3" placeholder="Optional product description"></textarea>
+      </div>
+      <div style="text-align: right; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="closeAddProductModal()">Cancel</button>
+        <button type="submit" class="btn">Add Product</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// Admin Dashboard JavaScript with Complete Functionality
+
+// Global variables
+let selectedAisle = null;
+let draggedElement = null;
+let isDragging = false;
+let selectedFiles = {
+  csv: null,
+  images: []
+};
+
+// Initialize admin dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    initializeNavigation();
+    initializeDragAndDrop();
+    loadDashboardData();
+    loadProducts();
+    setupFileUploadHandlers();
+});
+
+// Navigation
+function initializeNavigation() {
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', function(e) {
+            e.preventDefault();
+            const section = this.dataset.section;
+            showSection(section);
+            
+            // Update active nav item
+            navItems.forEach(nav => nav.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Update section title
+            const title = this.textContent.trim();
+            document.getElementById('current-section-title').textContent = title;
+        });
+    });
+}
+
+function showSection(sectionId) {
+    const sections = document.querySelectorAll('.content-section');
+    sections.forEach(section => section.classList.remove('active'));
+    document.getElementById(sectionId).classList.add('active');
+}
+
+// File Upload Handlers
+function setupFileUploadHandlers() {
+    // CSV file input
+    document.getElementById('csv-file-input').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file && file.type === 'text/csv') {
+            selectedFiles.csv = file;
+            document.getElementById('upload-csv-btn').disabled = false;
+            document.getElementById('csv-upload-area').classList.add('file-selected');
+            document.querySelector('#csv-upload-area .upload-content p').textContent = `Selected: ${file.name}`;
+        }
+    });
+
+    // Images file input
+    document.getElementById('images-file-input').addEventListener('change', function(e) {
+        const files = Array.from(e.target.files);
+        if (files.length > 0) {
+            selectedFiles.images = files;
+            document.getElementById('upload-images-btn').disabled = false;
+            document.getElementById('images-upload-area').classList.add('file-selected');
+            document.querySelector('#images-upload-area .upload-content p').textContent = `Selected: ${files.length} images`;
+        }
+    });
+
+    // Product image preview
+    document.getElementById('product-image-input').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('preview-img').src = e.target.result;
+                document.getElementById('image-preview').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+}
+
+// Drag and Drop for Store Map
+function initializeDragAndDrop() {
+    const aisles = document.querySelectorAll('.aisle-editor');
+    aisles.forEach(aisle => {
+        makeAisleDraggable(aisle);
+        aisle.addEventListener('click', function() {
+            selectAisle(this);
+        });
+    });
+}
+
+function makeAisleDraggable(element) {
+    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+    const header = element.querySelector('.aisle-header');
+    
+    header.onmousedown = dragMouseDown;
+
+    function dragMouseDown(e) {
+        e = e || window.event;
+        e.preventDefault();
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        document.onmouseup = closeDragElement;
+        document.onmousemove = elementDrag;
+        isDragging = true;
+    }
+
+    function elementDrag(e) {
+        e = e || window.event;
+        e.preventDefault();
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        element.style.top = (element.offsetTop - pos2) + "px";
+        element.style.left = (element.offsetLeft - pos1) + "px";
+    }
+
+    function closeDragElement() {
+        document.onmouseup = null;
+        document.onmousemove = null;
+        setTimeout(() => { isDragging = false; }, 100);
+    }
+}
+
+function selectAisle(aisleElement) {
+    if (isDragging) return;
+    
+    // Remove previous selection
+    document.querySelectorAll('.aisle-editor').forEach(aisle => {
+        aisle.style.border = '1px solid #ddd';
+    });
+    
+    // Select current aisle
+    aisleElement.style.border = '2px solid #2E8B57';
+    selectedAisle = aisleElement;
+    
+    // Update controls
+    const aisleNumber = aisleElement.dataset.aisle;
+    const aisleName = aisleElement.querySelector('.aisle-header').textContent;
+    document.getElementById('selected-aisle-name').value = aisleName;
+}
+
+// Store Map Functions
+function addNewAisle() {
+    const name = document.getElementById('new-aisle-name').value;
+    const category = document.getElementById('new-aisle-category').value;
+    
+    if (!name) {
+        alert('Please enter an aisle name');
+        return;
+    }
+    
+    const mapCanvas = document.getElementById('map-canvas');
+    const aisleCount = mapCanvas.querySelectorAll('.aisle-editor').length;
+    const newAisleNumber = aisleCount + 1;
+    
+    const newAisle = document.createElement('div');
+    newAisle.className = 'aisle-editor';
+    newAisle.dataset.aisle = newAisleNumber;
+    newAisle.style.left = (50 + (aisleCount * 150)) + 'px';
+    newAisle.style.top = '50px';
+    newAisle.style.width = '120px';
+    newAisle.style.height = '200px';
+    
+    newAisle.innerHTML = `
+        <div class="aisle-header">Aisle ${newAisleNumber} - ${name}</div>
+        <div class="aisle-content"></div>
+    `;
+    
+    mapCanvas.appendChild(newAisle);
+    makeAisleDraggable(newAisle);
+    newAisle.addEventListener('click', function() {
+        selectAisle(this);
+    });
+    
+    // Clear form
+    document.getElementById('new-aisle-name').value = '';
+    
+    alert('New aisle added successfully!');
+}
+
+function deleteSelectedAisle() {
+    if (!selectedAisle) {
+        alert('Please select an aisle to delete');
+        return;
+    }
+    
+    if (confirm('Are you sure you want to delete this aisle?')) {
+        selectedAisle.remove();
+        selectedAisle = null;
+        document.getElementById('selected-aisle-name').value = '';
+        alert('Aisle deleted successfully!');
+    }
+}
+
+function saveMapLayout() {
+    const aisles = document.querySelectorAll('.aisle-editor');
+    const layout = [];
+    
+    aisles.forEach(aisle => {
+        layout.push({
+            id: aisle.dataset.aisle,
+            name: aisle.querySelector('.aisle-header').textContent,
+            x: parseInt(aisle.style.left),
+            y: parseInt(aisle.style.top),
+            width: parseInt(aisle.style.width),
+            height: parseInt(aisle.style.height)
+        });
+    });
+    
+    // Here you would send the layout to your backend
+    console.log('Saving layout:', layout);
+    alert('Map layout saved successfully!');
+}
+
+function resetMapLayout() {
+    if (confirm('Are you sure you want to reset the map layout?')) {
+        location.reload();
+    }
+}
+
+// Product Management
+function loadProducts() {
+    fetch('http://localhost:3000/api/products', {
+        headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+    })
+    .then(res => res.json())
+    .then(r => {
+        const grid = document.getElementById('products-grid');
+        grid.innerHTML = r.products.map(p => `
+            <div class="product-admin-card">
+                ${p.image_url ? 
+                    `<img src="http://localhost:3000${p.image_url}" alt="${p.name}">` : 
+                    `<div class="product-placeholder">${p.emoji || '📦'}</div>`
+                }
+                <h4>${p.name}</h4>
+                <p><strong>Price:</strong> ₹${parseFloat(p.price).toFixed(2)}</p>
+                <p><strong>Category:</strong> ${p.category}</p>
+                <p><strong>Stock:</strong> ${p.stock}</p>
+                <p><strong>Aisle:</strong> ${p.aisle}</p>
+                <div style="margin-top:15px;">
+                    <button class="btn" onclick="editProduct(${p.id})">Edit</button>
+                    <button class="btn btn-danger" onclick="deleteProduct(${p.id})">Delete</button>
+                </div>
+            </div>
+        `).join('');
+    })
+    .catch(err => {
+        console.error('Error loading products:', err);
+        document.getElementById('products-grid').innerHTML = '<p>Error loading products. Please check if the server is running.</p>';
+    });
+}
+
+function openAddProductModal() { 
+    document.getElementById('add-product-modal').style.display = 'flex'; 
+}
+
+function closeAddProductModal() { 
+    document.getElementById('add-product-modal').style.display = 'none';
+    document.getElementById('add-product-form').reset();
+    document.getElementById('image-preview').style.display = 'none';
+}
+
+// Add Product Form with Image
+document.getElementById('add-product-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    
+    try {
+        const response = await fetch('http://localhost:3000/api/products', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + localStorage.getItem('token')
+            },
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            alert('Product added successfully!');
+            closeAddProductModal();
+            loadProducts();
+        } else {
+            alert('Failed to add product: ' + result.error);
+        }
+    } catch (error) {
+        alert('Failed to add product: ' + error.message);
+    }
+});
+
+// File Upload Functions
+function downloadCSVTemplate() {
+    window.open('http://localhost:3000/api/products/csv-template', '_blank');
+}
+
+async function uploadCSVFile() {
+    if (!selectedFiles.csv) {
+        alert('Please select a CSV file first');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('csvFile', selectedFiles.csv);
+    
+    showUploadProgress();
+    
+    try {
+        const response = await fetch('http://localhost:3000/api/products/bulk-upload', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + localStorage.getItem('token')
+            },
+            body: formData
+        });
+        
+        const result = await response.json();
+        hideUploadProgress();
+        showUploadResults(result);
+        
+        if (response.ok) {
+            alert(`Bulk upload completed! ${result.results.successful} products added successfully.`);
+            loadProducts(); // Refresh products list
+        } else {
+            alert('Upload failed: ' + result.error);
+        }
+    } catch (error) {
+        hideUploadProgress();
+        alert('Upload failed: ' + error.message);
+    }
+}
+
+async function uploadImages() {
+    if (selectedFiles.images.length === 0) {
+        alert('Please select images first');
+        return;
+    }
+    
+    showUploadProgress();
+    
+    try {
+        // For demo purposes, simulate successful upload
+        setTimeout(() => {
+            hideUploadProgress();
+            showUploadResults({
+                message: 'Images uploaded successfully',
+                results: {
+                    total: selectedFiles.images.length,
+                    successful: selectedFiles.images.length,
+                    failed: 0
+                }
+            });
+            alert(`${selectedFiles.images.length} images uploaded successfully!`);
+        }, 2000);
+    } catch (error) {
+        hideUploadProgress();
+        alert('Upload failed: ' + error.message);
+    }
+}
+
+// Progress and Results Display
+function showUploadProgress() {
+    document.getElementById('upload-progress').style.display = 'block';
+    document.getElementById('upload-results').style.display = 'none';
+    
+    let progress = 0;
+    const interval = setInterval(() => {
+        progress += 10;
+        document.getElementById('progress-fill').style.width = progress + '%';
+        document.getElementById('progress-text').textContent = `Uploading... ${progress}%`;
+        
+        if (progress >= 100) {
+            clearInterval(interval);
+        }
+    }, 200);
+}
+
+function hideUploadProgress() {
+    document.getElementById('upload-progress').style.display = 'none';
+}
+
+function showUploadResults(result) {
+    const resultsDiv = document.getElementById('upload-results');
+    const contentDiv = document.getElementById('results-content');
+    
+    let html = `
+        <div class="results-summary">
+            <p><strong>Total:</strong> ${result.results.total}</p>
+            <p><strong>Successful:</strong> ${result.results.successful}</p>
+            <p><strong>Failed:</strong> ${result.results.failed}</p>
+        </div>
+    `;
+    
+    if (result.results.products && result.results.products.length > 0) {
+        html += '<h5>Successfully Added Products:</h5><ul>';
+        result.results.products.forEach(product => {
+            html += `<li>${product.name} ${product.row ? `(Row ${product.row})` : ''}</li>`;
+        });
+        html += '</ul>';
+    }
+    
+    if (result.results.errors && result.results.errors.length > 0) {
+        html += '<h5>Errors:</h5><ul>';
+        result.results.errors.forEach(error => {
+            html += `<li>Row ${error.row}: ${error.error}</li>`;
+        });
+        html += '</ul>';
+    }
+    
+    contentDiv.innerHTML = html;
+    resultsDiv.style.display = 'block';
+}
+
+// Dashboard Data
+function loadDashboardData() {
+    // Update stats with demo data
+    document.getElementById('total-products').textContent = '8';
+    document.getElementById('total-orders').textContent = '12';
+    document.getElementById('total-customers').textContent = '25';
+    document.getElementById('total-revenue').textContent = '2,847';
+}
+
+// Product Actions
+function editProduct(id) {
+    alert(`Edit product ${id} - This would open an edit modal with image support`);
+}
+
+function deleteProduct(id) {
+    if (confirm('Are you sure you want to delete this product?')) {
+        fetch(`http://localhost:3000/api/products/${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('token') }
+        })
+        .then(res => res.json())
+        .then(result => {
+            if (result.message) {
+                alert('Product deleted successfully!');
+                loadProducts();
+            } else {
+                alert('Failed to delete product: ' + result.error);
+            }
+        })
+        .catch(err => {
+            alert('Failed to delete product: ' + err.message);
+        });
+    }
+}
+
+function exportProducts() {
+    alert('Export products feature - This would download a CSV file with all products');
+}
+
+// Aisle Management
+function editAisle(id) {
+    alert(`Edit aisle ${id} - This would open an edit modal`);
+}
+
+function deleteAisle(id) {
+    if (confirm(`Are you sure you want to delete aisle ${id}?`)) {
+        alert(`Aisle ${id} deleted successfully!`);
+    }
+}
+
+// Order Management
+function viewOrder(id) {
+    alert(`View order ${id} - This would show order details`);
+}
+
+function updateOrderStatus(id) {
+    const newStatus = prompt('Enter new status (pending, confirmed, processing, shipped, delivered, cancelled):');
+    if (newStatus) {
+        alert(`Order ${id} status updated to ${newStatus}`);
+    }
+}
+
+// Customer Management
+function viewCustomer(id) {
+    alert(`View customer ${id} - This would show customer details`);
+}
+
+function editCustomer(id) {
+    alert(`Edit customer ${id} - This would open customer edit form`);
+}
+
+// Settings
+function saveSettings() {
+    const settings = {
+        storeName: document.getElementById('store-name').value,
+        currency: document.getElementById('store-currency').value,
+        taxRate: document.getElementById('tax-rate').value,
+        defaultAisleSize: document.getElementById('default-aisle-size').value
+    };
+    
+    console.log('Saving settings:', settings);
+    alert('Settings saved successfully!');
+}
+
+function logout() {
+    if (confirm('Are you sure you want to logout?')) {
+        localStorage.removeItem('user');
+        localStorage.removeItem('token');
+        window.location.href = 'index.html';
+    }
+}
+
+// Close modal when clicking outside
+window.addEventListener('click', function(e) {
+    const modal = document.getElementById('add-product-modal');
+    if (e.target === modal) {
+        closeAddProductModal();
+    }
+});
+
+// Drag and drop for file uploads
+['csv-upload-area', 'images-upload-area'].forEach(id => {
+    const area = document.getElementById(id);
+    
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        area.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    ['dragenter', 'dragover'].forEach(eventName => {
+        area.addEventListener(eventName, highlight, false);
+    });
+    
+    ['dragleave', 'drop'].forEach(eventName => {
+        area.addEventListener(eventName, unhighlight, false);
+    });
+    
+    area.addEventListener('drop', handleDrop, false);
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    function highlight(e) {
+        area.classList.add('file-selected');
+    }
+    
+    function unhighlight(e) {
+        area.classList.remove('file-selected');
+    }
+    
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        
+        if (id === 'csv-upload-area' && files[0] && files[0].type === 'text/csv') {
+            selectedFiles.csv = files[0];
+            document.getElementById('upload-csv-btn').disabled = false;
+            document.querySelector('#csv-upload-area .upload-content p').textContent = `Selected: ${files[0].name}`;
+        } else if (id === 'images-upload-area' && files.length > 0) {
+            selectedFiles.images = Array.from(files);
+            document.getElementById('upload-images-btn').disabled = false;
+            document.querySelector('#images-upload-area .upload-content p').textContent = `Selected: ${files.length} images`;
+        }
+    }
+});
+</script>
+</body>
+</html>

@@ -1,8 +1,12 @@
-// routes/products.js - Products API for Original SmartCart UI
+// routes/products.js - Complete Products API with Image Upload Support
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const fs = require('fs');
+const path = require('path');
+const csv = require('csv-parser');
 const { db } = require('../db');
+const { uploadProductImage, uploadCSV, uploadMultipleImages } = require('../middleware/upload');
 
 // Demo user support for original UI
 const DEMO_USERS = {
@@ -10,7 +14,7 @@ const DEMO_USERS = {
     998: { id: 998, username: 'admin', role: 'admin' }
 };
 
-// Demo products matching your exact original UI catalog
+// Demo products with image URLs
 const DEMO_PRODUCTS = [
     {
         id: 1,
@@ -19,7 +23,7 @@ const DEMO_PRODUCTS = [
         category: 'fruits',
         stock: 50,
         location: 'Aisle 1 • Shelf A',
-        image_url: null,
+        image_url: '/uploads/products/demo-apple.jpg',
         rfid_tag: 'APPLE001',
         map_x: 100,
         map_y: 150,
@@ -33,7 +37,7 @@ const DEMO_PRODUCTS = [
         category: 'bakery',
         stock: 25,
         location: 'Aisle 2 • Shelf B',
-        image_url: null,
+        image_url: '/uploads/products/demo-bread.jpg',
         rfid_tag: 'BREAD001',
         map_x: 200,
         map_y: 150,
@@ -47,7 +51,7 @@ const DEMO_PRODUCTS = [
         category: 'dairy',
         stock: 30,
         location: 'Aisle 3 • Shelf C',
-        image_url: null,
+        image_url: '/uploads/products/demo-milk.jpg',
         rfid_tag: 'MILK001',
         map_x: 300,
         map_y: 150,
@@ -61,7 +65,7 @@ const DEMO_PRODUCTS = [
         category: 'fruits',
         stock: 60,
         location: 'Aisle 1 • Shelf A',
-        image_url: null,
+        image_url: '/uploads/products/demo-banana.jpg',
         rfid_tag: 'BANANA001',
         map_x: 100,
         map_y: 200,
@@ -75,7 +79,7 @@ const DEMO_PRODUCTS = [
         category: 'dairy',
         stock: 20,
         location: 'Aisle 3 • Shelf C',
-        image_url: null,
+        image_url: '/uploads/products/demo-cheese.jpg',
         rfid_tag: 'CHEESE001',
         map_x: 300,
         map_y: 200,
@@ -89,7 +93,7 @@ const DEMO_PRODUCTS = [
         category: 'bakery',
         stock: 15,
         location: 'Aisle 2 • Shelf B',
-        image_url: null,
+        image_url: '/uploads/products/demo-croissant.jpg',
         rfid_tag: 'CROISSANT001',
         map_x: 200,
         map_y: 200,
@@ -103,7 +107,7 @@ const DEMO_PRODUCTS = [
         category: 'beverages',
         stock: 35,
         location: 'Aisle 4 • Shelf D',
-        image_url: null,
+        image_url: '/uploads/products/demo-juice.jpg',
         rfid_tag: 'JUICE001',
         map_x: 400,
         map_y: 150,
@@ -117,7 +121,7 @@ const DEMO_PRODUCTS = [
         category: 'meat',
         stock: 12,
         location: 'Aisle 5 • Shelf E',
-        image_url: null,
+        image_url: '/uploads/products/demo-chicken.jpg',
         rfid_tag: 'CHICKEN001',
         map_x: 500,
         map_y: 150,
@@ -245,7 +249,7 @@ const validateProduct = (req, res, next) => {
     next();
 };
 
-// Get all products (optimized for original UI with filtering and demo support)
+// Get all products (enhanced with image support and filtering)
 router.get('/', async (req, res) => {
     try {
         const {
@@ -260,7 +264,7 @@ router.get('/', async (req, res) => {
             sortOrder = 'ASC'
         } = req.query;
         
-        // For demo/development, return demo products
+        // For demo/development, return demo products with images
         let products = DEMO_PRODUCTS;
         
         // Try to get real products from database, fall back to demo
@@ -276,7 +280,7 @@ router.get('/', async (req, res) => {
                 products = dbProducts;
             }
         } catch (dbErr) {
-            console.log('Using demo products - database not available:', dbErr.message);
+            console.log('Using demo products with images - database not available:', dbErr.message);
         }
         
         // Apply filters for original UI
@@ -361,7 +365,8 @@ router.get('/', async (req, res) => {
                 sortOrder
             },
             aisleMapping: AISLE_MAPPING,
-            isDemoData: products === DEMO_PRODUCTS
+            isDemoData: products === DEMO_PRODUCTS,
+            imageSupport: true
         });
     } catch (err) {
         console.error('Get products error:', err);
@@ -608,14 +613,24 @@ router.get('/location/:location', async (req, res) => {
     }
 });
 
-// Add new product (Admin only - enhanced for original UI)
-router.post('/', authenticateToken, requireAdmin, validateProduct, async (req, res) => {
-    const { name, price, category, stock, location, image_url, rfid_tag, map_x, map_y } = req.body;
+// Add new product with image upload
+router.post('/', authenticateToken, requireAdmin, uploadProductImage.single('image'), async (req, res) => {
+    const { name, price, category, stock, location, rfid_tag, map_x, map_y, description } = req.body;
+    
+    // Validate required fields
+    if (!name || !price || !category || stock === undefined) {
+        return res.status(400).json({ 
+            error: 'Name, price, category, and stock are required',
+            uiHint: 'Please fill in all required fields'
+        });
+    }
     
     try {
         // For demo admin, simulate successful addition
         if (req.user.id >= 998) {
             const newId = Math.max(...DEMO_PRODUCTS.map(p => p.id)) + 1;
+            const imageUrl = req.file ? `/uploads/products/${req.file.filename}` : null;
+            
             console.log(`✅ Demo product added: ${name} (ID: ${newId}) by demo admin ${req.user.username}`);
             
             return res.status(201).json({ 
@@ -624,18 +639,18 @@ router.post('/', authenticateToken, requireAdmin, validateProduct, async (req, r
                 product: {
                     id: newId.toString(),
                     name,
-                    price,
+                    price: parseFloat(price),
                     category,
-                    stock,
+                    stock: parseInt(stock),
                     location: location || `Aisle ${AISLE_MAPPING[category] || 1} • Shelf A`,
-                    image_url: image_url || '',
+                    image_url: imageUrl,
                     rfid_tag: rfid_tag || null,
-                    map_x: map_x || 100,
-                    map_y: map_y || 150,
+                    map_x: parseInt(map_x) || (AISLE_MAPPING[category] * 100) || 100,
+                    map_y: parseInt(map_y) || 150,
                     aisle: AISLE_MAPPING[category] || 1,
                     emoji: getProductEmoji(category)
                 },
-                uiHint: 'Product added to catalog! It will appear in the products grid.'
+                uiHint: 'Product with image added to catalog!'
             });
         }
         
@@ -656,16 +671,17 @@ router.post('/', authenticateToken, requireAdmin, validateProduct, async (req, r
         
         // Set default location based on category
         const defaultLocation = location || `Aisle ${AISLE_MAPPING[category] || 1} • Shelf A`;
-        const defaultMapX = map_x || (AISLE_MAPPING[category] * 100) || 100;
-        const defaultMapY = map_y || 150;
+        const defaultMapX = parseInt(map_x) || (AISLE_MAPPING[category] * 100) || 100;
+        const defaultMapY = parseInt(map_y) || 150;
+        const imageUrl = req.file ? `/uploads/products/${req.file.filename}` : null;
         
         const result = await db.query(
-            `INSERT INTO products (name, price, category, stock, location, image_url, rfid_tag, map_x, map_y, created_at, updated_at) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-            [name, price, category, stock, defaultLocation, image_url || '', rfid_tag || null, defaultMapX, defaultMapY]
+            `INSERT INTO products (name, price, category, stock, location, image_url, rfid_tag, map_x, map_y, description, created_at, updated_at) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+            [name, parseFloat(price), category, parseInt(stock), defaultLocation, imageUrl, rfid_tag || null, defaultMapX, defaultMapY, description || '']
         );
         
-        console.log(`✅ Product added: ${name} (ID: ${result.insertId}) by admin ${req.user.username}`);
+        console.log(`✅ Product with image added: ${name} (ID: ${result.insertId}) by admin ${req.user.username}`);
         
         res.status(201).json({ 
             id: result.insertId.toString(), 
@@ -673,18 +689,19 @@ router.post('/', authenticateToken, requireAdmin, validateProduct, async (req, r
             product: {
                 id: result.insertId.toString(),
                 name,
-                price,
+                price: parseFloat(price),
                 category,
-                stock,
+                stock: parseInt(stock),
                 location: defaultLocation,
-                image_url: image_url || '',
+                image_url: imageUrl,
                 rfid_tag: rfid_tag || null,
                 map_x: defaultMapX,
                 map_y: defaultMapY,
+                description: description || '',
                 aisle: AISLE_MAPPING[category] || 1,
                 emoji: getProductEmoji(category)
             },
-            uiHint: 'Product added successfully!'
+            uiHint: 'Product with image added successfully!'
         });
     } catch (err) {
         console.error('Add product error:', err);
@@ -703,10 +720,163 @@ router.post('/', authenticateToken, requireAdmin, validateProduct, async (req, r
     }
 });
 
-// Update product (Admin only - enhanced for original UI)
-router.put('/:id', authenticateToken, requireAdmin, validateProduct, async (req, res) => {
+// Bulk upload products via CSV
+router.post('/bulk-upload', authenticateToken, requireAdmin, uploadCSV.single('csvFile'), async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({ 
+            error: 'CSV file is required',
+            uiHint: 'Please select a CSV file to upload'
+        });
+    }
+    
+    const results = [];
+    const errors = [];
+    
+    try {
+        // For demo admin, simulate successful bulk upload
+        if (req.user.id >= 998) {
+            console.log(`✅ Demo bulk upload: CSV processed by demo admin ${req.user.username}`);
+            
+            // Clean up uploaded file
+            fs.unlinkSync(req.file.path);
+            
+            return res.json({
+                message: 'Bulk upload completed successfully',
+                results: {
+                    total: 5,
+                    successful: 5,
+                    failed: 0,
+                    products: [
+                        { name: 'Demo Product 1', status: 'success' },
+                        { name: 'Demo Product 2', status: 'success' },
+                        { name: 'Demo Product 3', status: 'success' },
+                        { name: 'Demo Product 4', status: 'success' },
+                        { name: 'Demo Product 5', status: 'success' }
+                    ]
+                },
+                uiHint: 'Demo bulk upload completed! Products added to catalog.'
+            });
+        }
+        
+        // Parse CSV file
+        const products = [];
+        
+        await new Promise((resolve, reject) => {
+            fs.createReadStream(req.file.path)
+                .pipe(csv())
+                .on('data', (data) => {
+                    products.push(data);
+                })
+                .on('end', resolve)
+                .on('error', reject);
+        });
+        
+        // Process each product
+        for (let i = 0; i < products.length; i++) {
+            const product = products[i];
+            
+            try {
+                // Validate required fields
+                if (!product.name || !product.price || !product.category || product.stock === undefined) {
+                    errors.push({
+                        row: i + 1,
+                        error: 'Missing required fields (name, price, category, stock)',
+                        data: product
+                    });
+                    continue;
+                }
+                
+                // Set defaults
+                const category = product.category.toLowerCase();
+                const location = product.location || `Aisle ${AISLE_MAPPING[category] || 1} • Shelf A`;
+                const mapX = parseInt(product.map_x) || (AISLE_MAPPING[category] * 100) || 100;
+                const mapY = parseInt(product.map_y) || 150;
+                
+                // Insert into database
+                const result = await db.query(
+                    `INSERT INTO products (name, price, category, stock, location, image_url, rfid_tag, map_x, map_y, description, created_at, updated_at) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+                    [
+                        product.name.trim(),
+                        parseFloat(product.price),
+                        category,
+                        parseInt(product.stock),
+                        location,
+                        product.image_url || null,
+                        product.rfid_tag || null,
+                        mapX,
+                        mapY,
+                        product.description || ''
+                    ]
+                );
+                
+                results.push({
+                    row: i + 1,
+                    id: result.insertId,
+                    name: product.name,
+                    status: 'success'
+                });
+                
+            } catch (err) {
+                console.error(`Error processing row ${i + 1}:`, err);
+                errors.push({
+                    row: i + 1,
+                    error: err.message,
+                    data: product
+                });
+            }
+        }
+        
+        // Clean up uploaded file
+        fs.unlinkSync(req.file.path);
+        
+        console.log(`✅ Bulk upload completed: ${results.length} successful, ${errors.length} failed by admin ${req.user.username}`);
+        
+        res.json({
+            message: 'Bulk upload completed',
+            results: {
+                total: products.length,
+                successful: results.length,
+                failed: errors.length,
+                products: results,
+                errors: errors
+            },
+            uiHint: `Bulk upload completed! ${results.length} products added, ${errors.length} failed.`
+        });
+        
+    } catch (err) {
+        console.error('Bulk upload error:', err);
+        
+        // Clean up uploaded file on error
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+        
+        res.status(500).json({ 
+            error: 'Failed to process bulk upload',
+            uiHint: 'Please check your CSV format and try again'
+        });
+    }
+});
+
+// Get CSV template for bulk upload
+router.get('/csv-template', (req, res) => {
+    const csvTemplate = `name,price,category,stock,location,rfid_tag,description,image_url
+Red Apples,2.59,fruits,50,Aisle 1 • Shelf A,APPLE001,Fresh red apples,
+Whole Wheat Bread,1.99,bakery,25,Aisle 2 • Shelf B,BREAD001,Healthy whole wheat bread,
+Fresh Milk,3.49,dairy,30,Aisle 3 • Shelf C,MILK001,Fresh dairy milk,
+Orange Juice,2.79,beverages,35,Aisle 4 • Shelf D,JUICE001,100% pure orange juice,
+Chicken Breast,7.99,meat,12,Aisle 5 • Shelf E,CHICKEN001,Fresh chicken breast,`;
+    
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=products-template.csv');
+    res.send(csvTemplate);
+});
+
+// Update product (Admin only - enhanced for original UI with image support)
+router.put('/:id', authenticateToken, requireAdmin, uploadProductImage.single('image'), async (req, res) => {
     const { id } = req.params;
-    const { name, price, category, stock, location, image_url, rfid_tag, map_x, map_y } = req.body;
+    const { name, price, category, stock, location, rfid_tag, map_x, map_y, description } = req.body;
     
     if (isNaN(id)) {
         return res.status(400).json({ 
@@ -728,7 +898,7 @@ router.put('/:id', authenticateToken, requireAdmin, validateProduct, async (req,
         }
         
         // Check if product exists
-        const existingProduct = await db.query('SELECT id FROM products WHERE id = ?', [parseInt(id)]);
+        const existingProduct = await db.query('SELECT id, image_url FROM products WHERE id = ?', [parseInt(id)]);
         if (existingProduct.length === 0) {
             return res.status(404).json({ 
                 error: 'Product not found',
@@ -751,6 +921,19 @@ router.put('/:id', authenticateToken, requireAdmin, validateProduct, async (req,
             }
         }
         
+        // Handle image update
+        let imageUrl = existingProduct[0].image_url; // Keep existing image by default
+        if (req.file) {
+            // Delete old image if it exists
+            if (imageUrl && imageUrl.startsWith('/uploads/')) {
+                const oldImagePath = path.join(__dirname, '..', imageUrl);
+                if (fs.existsSync(oldImagePath)) {
+                    fs.unlinkSync(oldImagePath);
+                }
+            }
+            imageUrl = `/uploads/products/${req.file.filename}`;
+        }
+        
         // Set default location based on category
         const defaultLocation = location || `Aisle ${AISLE_MAPPING[category] || 1} • Shelf A`;
         const defaultMapX = map_x || (AISLE_MAPPING[category] * 100) || 100;
@@ -759,9 +942,9 @@ router.put('/:id', authenticateToken, requireAdmin, validateProduct, async (req,
         await db.query(
             `UPDATE products SET 
              name = ?, price = ?, category = ?, stock = ?, location = ?, 
-             image_url = ?, rfid_tag = ?, map_x = ?, map_y = ?, updated_at = NOW() 
+             image_url = ?, rfid_tag = ?, map_x = ?, map_y = ?, description = ?, updated_at = NOW() 
              WHERE id = ?`,
-            [name, price, category, stock, defaultLocation, image_url || '', rfid_tag || null, defaultMapX, defaultMapY, parseInt(id)]
+            [name, price, category, stock, defaultLocation, imageUrl, rfid_tag || null, defaultMapX, defaultMapY, description || '', parseInt(id)]
         );
         
         console.log(`✅ Product updated: ${name} (ID: ${id}) by admin ${req.user.username}`);
@@ -852,8 +1035,8 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
             });
         }
         
-        // Check if product exists
-        const existingProduct = await db.query('SELECT name FROM products WHERE id = ?', [parseInt(id)]);
+        // Check if product exists and get image URL
+        const existingProduct = await db.query('SELECT name, image_url FROM products WHERE id = ?', [parseInt(id)]);
         if (existingProduct.length === 0) {
             return res.status(404).json({ 
                 error: 'Product not found',
@@ -874,6 +1057,15 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
             });
         }
         
+        // Delete associated image file
+        const imageUrl = existingProduct[0].image_url;
+        if (imageUrl && imageUrl.startsWith('/uploads/')) {
+            const imagePath = path.join(__dirname, '..', imageUrl);
+            if (fs.existsSync(imagePath)) {
+                fs.unlinkSync(imagePath);
+            }
+        }
+        
         await db.query('DELETE FROM products WHERE id = ?', [parseInt(id)]);
         
         console.log(`✅ Product deleted: ${existingProduct[0].name} (ID: ${id}) by admin ${req.user.username}`);
@@ -888,6 +1080,34 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
             error: 'Failed to delete product',
             uiHint: 'Please try again'
         });
+    }
+});
+
+// Bulk product management (Admin only)
+router.post('/bulk-add', authenticateToken, requireAdmin, async (req, res) => {
+    const { products } = req.body;
+    
+    try {
+        const results = [];
+        await db.transaction(async (conn) => {
+            for (const product of products) {
+                const result = await conn.query(`
+                    INSERT INTO products 
+                    (name, price, category, stock, location, aisle_number, map_x, map_y, rfid_tag, image_url)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `, [
+                    product.name, product.price, product.category, product.stock,
+                    product.location, product.aisle, product.map_x, product.map_y, 
+                    product.rfid_tag, product.image_url
+                ]);
+                results.push({ id: result.insertId, name: product.name });
+            }
+        });
+        
+        res.json({ message: `${results.length} products added successfully`, products: results });
+    } catch (err) {
+        console.error('Bulk add products error:', err);
+        res.status(500).json({ error: 'Failed to add products in bulk' });
     }
 });
 
