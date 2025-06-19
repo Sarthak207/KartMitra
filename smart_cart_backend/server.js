@@ -1,4 +1,7 @@
 // server.js - Smart Cart Backend API Server with File Upload Support
+require('dotenv').config({ path: __dirname + '/.env' });
+console.log("Razorpay Key:", process.env.RAZORPAY_KEY_ID ? "Loaded" : "Missing");
+
 BigInt.prototype.toJSON = function () { return this.toString(); };
 
 const express = require('express');
@@ -14,17 +17,20 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 const corsOptions = {
     origin: function (origin, callback) {
         if (!origin) return callback(null, true);
-        
         const allowedOrigins = [
-            'http://localhost:3000',
-            'http://127.0.0.1:3000',
-            'http://localhost:8080',
-            'http://127.0.0.1:8080',
-            'http://localhost:5000',
-            'http://127.0.0.1:5000',
-            'file://',
-            'null'
-        ];
+      'file://', 
+      'http://localhost:*', 
+      'http://127.0.0.1:*',
+      'null'
+    ];
+    
+    if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+        
         
         if (NODE_ENV === 'development') {
             return callback(null, true);
@@ -61,6 +67,7 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Static file serving for uploaded images
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/api/payments', require('./routes/payments'));
 
 // Request logging
 app.use((req, res, next) => {

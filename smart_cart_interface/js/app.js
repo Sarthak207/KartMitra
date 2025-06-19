@@ -1,4 +1,4 @@
-// Smart Cart Frontend - Enhanced with Admin Redirect
+// Smart Cart Frontend - Enhanced with Admin Redirect and Razorpay Integration
 
 function SmartCartApp() {
     this.currentUser = null;
@@ -622,19 +622,120 @@ SmartCartApp.prototype.updateCartSummary = function() {
     this.updateCartCount();
 };
 
+// Enhanced Razorpay Checkout Function
 SmartCartApp.prototype.checkout = function() {
     if (this.cart.length === 0) {
         this.showErrorMessage('Your cart is empty');
         return;
     }
+
+    const self = this;
+    const totalAmount = this.totalAmount;
     
-    var self = this;
-    this.showSuccessMessage('Order placed successfully! Total: ₹' + this.totalAmount.toFixed(2));
+    console.log("Initiating checkout with amount:", totalAmount);
+
+    // Show loading indicator
+    this.showAddToCartFeedback('Initializing payment...');
+
+    fetch(this.API_BASE_URL + '/payments/create-order', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + localStorage.getItem('token')
+        },
+        body: JSON.stringify({ amount: totalAmount })
+    })
+    .then(res => {
+        console.log("Order creation response status:", res.status);
+        return res.json();
+    })
+    .then(order => {
+        console.log("Order created:", order);
+        
+        if (!order.id || !order.amount) {
+            self.showErrorMessage('Payment initialization failed: Invalid order response');
+            return;
+        }
+	 if (order.error) {
+      throw new Error(order.error);
+    }
     
-    // Clear cart after successful checkout
-    setTimeout(function() {
-        self.clearCart();
-    }, 2000);
+    // Validate order structure
+    if (!order.id || !order.amount) {
+      throw new Error('Invalid order response from server');
+    }
+        
+        const options = {
+            "key": order.key || "rzp_test_oxet2h10lRqsyR",
+            "amount": order.amount,
+            "currency": order.currency || "INR",
+            "name": "SmartCart Store",
+            "description": "Purchase of " + self.cart.length + " items",
+            "order_id": order.id,
+            "handler": function(response) {
+                console.log("Payment successful:", response);
+                self.showSuccessMessage('Processing payment...');
+                
+                fetch(self.API_BASE_URL + '/payments/verify-payment', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + localStorage.getItem('token')
+                    },
+                    body: JSON.stringify({
+                        order_id: response.razorpay_order_id,
+                        payment_id: response.razorpay_payment_id,
+                        signature: response.razorpay_signature
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        self.showSuccessMessage('Payment successful! Order placed.');
+                        self.clearCart();
+                    } else {
+                        self.showErrorMessage('Payment verification failed: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(err => {
+                    console.error("Payment verification error:", err);
+                    self.showErrorMessage('Payment verification failed. Please contact support.');
+                });
+            },
+            "prefill": {
+                "name": self.currentUser && self.currentUser.name ? self.currentUser.name : "",
+                "email": self.currentUser && self.currentUser.email ? self.currentUser.email : "",
+                "contact": ""
+            },
+            "theme": {
+                "color": "#2E8B57"
+            },
+            "modal": {
+                "ondismiss": function() {
+                    console.log("Checkout form closed");
+                    self.showAddToCartFeedback('Payment cancelled');
+                }
+            }
+        };
+        
+        console.log("Opening Razorpay with options:", options);
+        
+        try {
+            const rzp = new window.Razorpay(options);
+            rzp.on('payment.failed', function(response) {
+                console.error("Payment failed:", response.error);
+                self.showErrorMessage('Payment failed: ' + response.error.description);
+            });
+            rzp.open();
+        } catch (err) {
+            console.error("Razorpay initialization error:", err);
+            self.showErrorMessage('Could not initialize payment form. Please try again.');
+        }
+    })
+    .catch(err => {
+        console.error("Order creation error:", err);
+        self.showErrorMessage('Payment initialization failed. Please try again later.');
+    });
 };
 
 SmartCartApp.prototype.logout = function() {
